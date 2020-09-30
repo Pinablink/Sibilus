@@ -1,0 +1,80 @@
+/*
+Autor: Weber Alves dos Santos (Pinablink)
+*/
+;----------------------------------------------------------------------------------------------
+#include "msp430g2553.h" 
+#include "GGIZ_SIBILUS_HEADER.h"
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+        NAME    FLASH_SIBILUS_CTR
+        EXTERN  GRAVAR_FLASH, APAGAR_FLASH_128
+;----------------------------------------------------------------------------------------------                                         
+        PUBLIC VERIFICACAO_STATUS, CONFIG_SIBILUS, REGISTRA_ERRO_FATAL
+        RSEG   CODE                   
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+REGISTRA_ERRO_FATAL
+;----------------------------------------------------------------------------------------------
+        ; LEMBRETE ADICIONAR NA PLANILHA DESCRITIVA
+        MOV.W       #FWKEY+FSSEL0+FN1,&FCTL2  
+        MOV.W       #FWKEY+WRT,&FCTL1          
+        MOV.W       #FWKEY,&FCTL3      
+        MOV.B       #09DH,&01000H
+        MOV.B       #053H,&01001H
+        MOV.B       #049H,&01002H
+        MOV.B       #042H,&01003H
+        MOV.B       #049H,&01004H
+        MOV.B       #04cH,&01005H
+        MOV.B       #055H,&01006H
+        MOV.B       #053H,&01007H  
+        MOV.W       #FWKEY,&FCTL1   
+        MOV.W       #FWKEY+LOCK,&FCTL3
+        RET 
+;---------------------------------------------------------------------------------------------- 
+;----------------------------------------------------------------------------------------------
+CONFIG_SIBILUS
+;----------------------------------------------------------------------------------------------
+        ; LEMBRETE ADICIONAR NA PLANILHA DESCRITIVA
+        MOV.W       #FWKEY+FSSEL0+FN1,&FCTL2  
+        MOV.W       #FWKEY+WRT,&FCTL1          
+        MOV.W       #FWKEY,&FCTL3      
+        MOV.B       #0DCH,&01000H
+        MOV.B       #053H,&01001H
+        MOV.B       #049H,&01002H
+        MOV.B       #042H,&01003H
+        MOV.B       #049H,&01004H
+        MOV.B       #04cH,&01005H
+        MOV.B       #055H,&01006H
+        MOV.B       #053H,&01007H  
+        MOV.W       #FWKEY,&FCTL1   
+        MOV.W       #FWKEY+LOCK,&FCTL3
+        RET 
+;---------------------------------------------------------------------------------------------- 
+;----------------------------------------------------------------------------------------------
+VERIFICACAO_STATUS; VERIFICA NO ENDEREÇO 0x1000 SE APLICAÇÃO JÁ EXECUTOU SUAS CONFIGURAÇOES E ESTA RETONANDO AO FUNCIONAMENTO
+;----------------------------------------------------------------------------------------------
+                 MOV.B       &01000H,R4
+                 CMP.B       #0DCH,R4
+                 JZ          APP_RETOMADO
+                 JMP         VER_ERRO
+APP_RETOMADO:    MOV.B       #0DCH,&0200H 
+                 JMP         END_1 
+VER_ERRO:        CMP.B       #09DH,R4
+                 JZ          ERRO_FATAL1
+                 JMP         APP_INICILIZADO
+ERRO_FATAL1:     CALL        #ERRO_FATAL_FLASH_INFO
+APP_INICILIZADO: MOV.B       #0C4H,&0200H       
+END_1            RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+ERRO_FATAL_FLASH_INFO;AREA QUE INDICA UM MAU FUNCIONAMENTO DO SOFTWARE QUE IMPOSSIBILITA O USO DO HARDWARE. O PROCESSAMENTO FICA PRESO NESSA REGIÃO
+           ;SÓ É POSSIVEL AJUSTAR VERIFICANDO O CODÍGO E APAGANDO A MEMÓRIA DE PROGRAMA
+;----------------------------------------------------------------------------------------------
+           BIC.B   #BIT6,&P1OUT
+ERRO_EXEC: NOP
+           JMP     ERRO_EXEC
+           RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------                                         
+        END 
+;----------------------------------------------------------------------------------------------

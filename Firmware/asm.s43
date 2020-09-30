@@ -1,0 +1,122 @@
+/*
+* ============================================================================== 
+*  Autor: Weber Alves dos Santos (Pinablink)
+* ==============================================================================
+*   ESTADOS DA APLICAÇÃO
+*   0C4H - INICIALIZANDO, SENDO LIGADO PELA PRIMEIRA VEZ
+*   0DCH - JÁ FOI INICIALIZADO, ESTA SENDO RELIGADO
+*   
+*   ESTADOS DE TRABALHO
+*   0DBH - INDICA SITUAÇÃO NORMAL DE TRABALHO
+*   09DH - INDICA ERRO FATAL INCAPACITANDO O HARDWARE DE TRABALHAR
+*
+*   Mapa da Memoria RAM
+*   0200H - INFORMA O ESTADO DA APLICAÇÃO - VER ESTADOS DA APLICAÇÃO 
+*   0201H - INFORMA O ESTADO DE TRABALHO  - VER ESTADOS DE TRABALHO
+*   
+*   0202H - ESPAÇO NA MEMÓRIA RAM PARA INCLUIR DADOS NA MEMÓRIA FLASH DE INFORMAÇÃO 
+*   28 bytes cifra a
+*   16 bytes cifra b
+*   30 bytes cifra c
+*   28 bytes cifra d
+*   14 bytes cifra e
+*   28 bytes cifra f
+*   28 bytes cifra g
+*/
+;----------------------------------------------------------------------------------------------
+#include "msp430g2553.h"     
+#include "./lib/GGIZ_SIBILUS_HEADER.h"
+#include "./lib/GGIZ_SIBILUS_CIFRA_A.h"
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+        NAME    GGIZ_SIBILUS
+        EXTERN  VERIFICACAO_STATUS, VALIDA_INICIALIZACAO, CONFIG_SIBILUS, APAGAR_FLASH_128, REGISTRA_ERRO_FATAL, CARREGAR_CIFRAS
+;----------------------------------------------------------------------------------------------                                         
+        RSEG    CSTACK                  
+        RSEG    CODE                    
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+; AREA DE INICIALIZAÇÃO E CONFIGURAÇÃO
+;----------------------------------------------------------------------------------------------
+RESET:          MOV      #SFE(CSTACK), SP
+                MOV.W    #WDTPW+WDTHOLD,&WDTCTL
+                CALL     #LIMPAR_REGISTRADORES
+                CALL     #CONFIGURAR_PORTAS
+                CALL     #ALOCAR_16BYTES_RAM
+                CALL     #VERIFICACAO_STATUS
+                CMP.B    #0C4H,&0200H
+                JZ       CONFIGURACAO
+                JMP      EXECUCAO  
+CONFIGURACAO:   CALL     #APAGAR_FLASH_128 
+                CALL     #CONFIG_SIBILUS
+                CALL     #VERIFICAR_MEMORIA_INFO
+EXECUCAO:       BIS.B    #BIT6,&P1OUT
+;----------------------------------------------------------------------------------------------
+;  AREA DE INICIALIZAÇÃO E CONFIGURAÇÃO
+;----------------------------------------------------------------------------------------------
+                CALL     #CARREGAR_CIFRAS
+                JMP      $
+;----------------------------------------------------------------------------------------------
+LIMPAR_REGISTRADORES ;LIMPA OS REGISTRADORES DE USO GERAL
+;----------------------------------------------------------------------------------------------
+                MOV.W     #0H,R4
+                MOV.W     #0H,R5
+                MOV.W     #0H,R6
+                MOV.W     #0H,R7
+                MOV.W     #0H,R8
+                MOV.W     #0H,R9
+                MOV.W     #0H,R10
+                MOV.W     #0H,R11
+                MOV.W     #0H,R12
+                MOV.W     #0H,R13
+                MOV.W     #0H,R14
+                MOV.W     #0H,R15
+                RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+CONFIGURAR_PORTAS ;
+;----------------------------------------------------------------------------------------------
+                MOV.B    #000H,&P1OUT
+                BIS.B    #BIT0+BIT6,&P1DIR
+                RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+VERIFICAR_MEMORIA_INFO ;VERIFICA A MEMÓRIA FLASH SE AINDA NÃO ESTIVER INICIALIZADA CHAMA O INICIALIZADOR
+;----------------------------------------------------------------------------------------------
+                CMP.B   #0DCH,&01000H
+                JZ      VER1END
+                CALL    #ERRO_FATAL                
+VER1END:        MOV.B   #0DBH,&0201H
+                RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+ALOCAR_16BYTES_RAM;
+;----------------------------------------------------------------------------------------------
+                MOV.W    #0DCH,R4
+CONTINUE_1:     TST      R4
+                JZ       END_1
+                MOV.B    #0DFH,0200H(R5)
+                DEC.W    R4
+                INC.W    R5
+                JMP      CONTINUE_1
+END_1:          NOP                
+                RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+ERRO_FATAL;AREA QUE INDICA UM MAU FUNCIONAMENTO DO SOFTWARE QUE IMPOSSIBILITA O USO DO HARDWARE. O PROCESSAMENTO FICA PRESO NESSA REGIÃO
+           ;SÓ É POSSIVEL AJUSTAR VERIFICANDO O CODÍGO E APAGANDO A MEMÓRIA DE PROGRAMA
+;----------------------------------------------------------------------------------------------
+           BIS.B   #BIT0,&P1OUT
+           CALL    #APAGAR_FLASH_128 
+           CALL    #REGISTRA_ERRO_FATAL
+ERRO_EXEC: NOP
+           JMP     ERRO_EXEC
+           RET 
+;----------------------------------------------------------------------------------------------
+;----------------------------------------------------------------------------------------------
+       COMMON      INTVEC
+;----------------------------------------------------------------------------------------------
+       ORG         RESET_VECTOR
+       DW          RESET
+       END
+;----------------------------------------------------------------------------------------------
